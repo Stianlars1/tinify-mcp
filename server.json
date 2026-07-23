@@ -1,0 +1,36 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
+  "name": "dev.tinify/mcp",
+  "description": "Compress, resize, crop, and convert images with the Tinify.dev API from Claude, Cursor, or any MCP client.",
+  "repository": {
+    "url": "https://github.com/tinify-dev/tinify-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "websiteUrl": "https://tinify.dev/developers",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@tinify-dev/mcp",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "TINIFY_API_KEY",
+          "description": "Tinify.dev API key (tnf_live_* or tnf_test_*), created at https://tinify.dev/developers. Free tier: 500 operations/month.",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "TINIFY_BASE_URL",
+          "description": "Override the API origin (advanced; defaults to https://api.tinify.dev).",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

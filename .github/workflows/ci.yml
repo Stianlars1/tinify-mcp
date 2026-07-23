@@ -1,0 +1,31 @@
+# NOTE: requires @tinify-dev/client to be published to npm. During local
+# development the dependency is "file:../tinify-sdk-js"; swap it to "^0.1.0"
+# before pushing (see the publish checklist in the README/CHANGELOG).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: stdio smoke test
+        run: npm run smoke

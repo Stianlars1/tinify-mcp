@@ -1,0 +1,25 @@
+# Smithery configuration — https://smithery.ai/docs/config
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    required:
+      - tinifyApiKey
+    properties:
+      tinifyApiKey:
+        type: string
+        description: >-
+          Tinify.dev API key (tnf_live_* or tnf_test_*), created at
+          https://tinify.dev/developers. Free tier: 500 operations/month.
+      baseUrl:
+        type: string
+        description: Override the API origin (advanced; defaults to https://api.tinify.dev).
+  commandFunction: |-
+    (config) => ({
+      command: 'node',
+      args: ['dist/index.js'],
+      env: {
+        TINIFY_API_KEY: config.tinifyApiKey,
+        ...(config.baseUrl ? { TINIFY_BASE_URL: config.baseUrl } : {})
+      }
+    })
