@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "dev.tinify/mcp",
-  "description": "Compress, resize, crop, and convert images with the Tinify.dev API from Claude, Cursor, or any MCP client.",
+  "description": "Compress, resize, crop, and convert images with the Tinify.dev API from any MCP client.",
   "repository": {
     "url": "https://github.com/Stianlars1/tinify-mcp",
     "source": "github"
