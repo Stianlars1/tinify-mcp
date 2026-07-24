@@ -1,0 +1,43 @@
+{
+  "manifest_version": "0.2",
+  "name": "tinify",
+  "display_name": "Tinify image tools",
+  "version": "0.1.1",
+  "description": "Compress, resize, crop, and convert images with the Tinify.dev API. Honest results: compression never returns a larger file.",
+  "long_description": "Five image tools for Claude: compress_image, resize_image, crop_image, convert_image, and get_usage. Files are processed by the Tinify.dev API (AVIF, WebP, JPEG, PNG), results are written next to your originals - never silently overwriting them - and every response reports real byte counts. Free tier: 500 operations per month, no card required. Limits: 40 MB / 50 megapixels per image; results expire after two hours.",
+  "author": {
+    "name": "Stian Larsen",
+    "url": "https://tinify.dev"
+  },
+  "homepage": "https://tinify.dev/mcp",
+  "documentation": "https://github.com/Stianlars1/tinify-mcp",
+  "license": "MIT",
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.cjs",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.cjs"],
+      "env": {
+        "TINIFY_API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Tinify API key",
+      "description": "Create a free key at https://tinify.dev/developers (500 operations/month, no card). Format: tnf_live_...",
+      "sensitive": true,
+      "required": true
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=20"
+    }
+  },
+  "keywords": ["images", "compression", "webp", "avif", "image-optimization"]
+}
