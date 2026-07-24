@@ -55,7 +55,7 @@ export class ToolInputError extends Error {}
 
 /**
  * Validates an input image path: absolute, exists, supported extension,
- * and at most 40 MB (the API limit — checked here to fail fast).
+ * and at most 40 MB (the API limit - checked here to fail fast).
  */
 export async function validateInputPath(
   inputPath: string,
@@ -95,7 +95,7 @@ export async function validateInputPath(
  *   source).
  * - An explicit `output_path` must be absolute.
  * - Writing over the SOURCE image requires BOTH `output_path` pointing at it
- *   AND `overwrite: true` — it never happens silently.
+ *   AND `overwrite: true` - it never happens silently.
  * - Overwriting any other existing file requires `overwrite: true`.
  */
 export function resolveOutputPath(options: {
