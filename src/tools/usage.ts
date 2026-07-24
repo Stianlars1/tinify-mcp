@@ -28,7 +28,7 @@ export const getUsageTool = {
       readOnlyHint: true,
       destructiveHint: false,
       idempotentHint: true,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {

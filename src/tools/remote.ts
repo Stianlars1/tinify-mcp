@@ -222,7 +222,7 @@ export const remoteCompressImageTool = {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {
@@ -321,7 +321,7 @@ export const remoteResizeImageTool = {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {
@@ -410,7 +410,7 @@ export const remoteCropImageTool = {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {
@@ -475,7 +475,7 @@ export const remoteConvertImageTool = {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {

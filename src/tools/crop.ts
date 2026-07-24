@@ -51,7 +51,7 @@ export const cropImageTool = {
       readOnlyHint: false,
       destructiveHint: false,
       idempotentHint: false,
-      openWorldHint: true,
+      openWorldHint: false,
     },
   },
   makeHandler(client: TinifyLikeClient) {

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="t">
+  <title id="t">tinify.dev mark — violet (two-tone primary)</title>
+  <!-- Large square: brand violet hsl(263.4 70% 50.4%) = #6D28D9. Small square: foreground hsl(0 0% 98%) = #FAFAFA.
+       The mask carves a negative-space gap out of the large square's bottom-right so the two shapes read as separate. -->
+  <defs>
+    <mask id="step-gap-violet">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="278" y="278" width="212" height="212" rx="53" fill="#000"/>
+    </mask>
+  </defs>
+  <rect x="44" y="44" width="300" height="300" rx="60" fill="#6D28D9" mask="url(#step-gap-violet)"/>
+  <rect x="300" y="300" width="168" height="168" rx="31" fill="#FAFAFA"/>
+</svg>
