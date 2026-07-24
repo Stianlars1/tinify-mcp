@@ -7,6 +7,7 @@ import type {
 } from "@tinify-dev/client";
 import {
   changePercent,
+  DOWNLOAD_TIMEOUT_MS,
   formatBytes,
   SUPPORTED_EXTENSIONS,
   textResult,
@@ -257,7 +258,7 @@ export const remoteCompressImageTool = {
           );
         }
 
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         const imageBase64 = await blobToBase64(blob);
         const pct = changePercent(data.original_bytes, data.result_bytes);
         return textResult(
@@ -348,7 +349,7 @@ export const remoteResizeImageTool = {
           ...(filename !== undefined ? { filename } : {}),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         const imageBase64 = await blobToBase64(blob);
         const dims =
           data.width !== null && data.height !== null
@@ -426,7 +427,7 @@ export const remoteCropImageTool = {
           ...(filename !== undefined ? { filename } : {}),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         const imageBase64 = await blobToBase64(blob);
         return textResult(
           `Cropped ${filename ?? "image"} to ${args.width}x${args.height}` +
@@ -491,7 +492,7 @@ export const remoteConvertImageTool = {
           ...(filename !== undefined ? { filename } : {}),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         const imageBase64 = await blobToBase64(blob);
         return textResult(
           `Converted ${filename ?? "image"} to ${args.format}: ` +

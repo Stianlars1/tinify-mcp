@@ -36,6 +36,14 @@ const REFRESH_TOKEN_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days.
 /** Cap on stored registrations/tokens so a hostile client can't OOM us. */
 const MAX_STORED_ENTRIES = 50_000;
 
+/**
+ * Registered clients have no natural expiry, so without a TTL the `clients` map
+ * grows unbounded (/register is open and /authorize lazily registers). Evict
+ * registrations older than this; an evicted-but-active client (e.g. ChatGPT)
+ * simply re-registers lazily on its next /authorize.
+ */
+const CLIENT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 interface RegisteredClient {
   clientId: string;
   redirectUris: string[];
@@ -163,6 +171,9 @@ export function createOAuthProvider(
 
   function sweepExpired(): void {
     const now = Date.now();
+    for (const [id, entry] of clients) {
+      if (now - entry.createdAt > CLIENT_TTL_MS) clients.delete(id);
+    }
     for (const [code, entry] of authCodes) {
       if (entry.expiresAt <= now) authCodes.delete(code);
     }
@@ -171,6 +182,22 @@ export function createOAuthProvider(
     }
     for (const [token, entry] of refreshTokens) {
       if (entry.expiresAt <= now) refreshTokens.delete(token);
+    }
+  }
+
+  /**
+   * Enforces a hard cap on the `clients` map before an insertion. Sweeps
+   * expired entries first; if still at the cap, FIFO-evicts the oldest
+   * registrations (Map preserves insertion order). Safe because unknown
+   * client_ids re-register lazily at /authorize.
+   */
+  function enforceClientCap(): void {
+    if (clients.size < MAX_STORED_ENTRIES) return;
+    sweepExpired();
+    while (clients.size >= MAX_STORED_ENTRIES) {
+      const oldest = clients.keys().next().value;
+      if (oldest === undefined) break;
+      clients.delete(oldest);
     }
   }
 
@@ -298,7 +325,7 @@ export function createOAuthProvider(
       return;
     }
 
-    if (clients.size >= MAX_STORED_ENTRIES) sweepExpired();
+    enforceClientCap();
     const clientId = randomId("mcp_client_");
     const now = Date.now();
     clients.set(clientId, { clientId, redirectUris, createdAt: now });
@@ -357,7 +384,7 @@ export function createOAuthProvider(
         );
         return null;
       }
-      if (clients.size >= MAX_STORED_ENTRIES) sweepExpired();
+      enforceClientCap();
       client = { clientId, redirectUris: [redirectUri], createdAt: Date.now() };
       clients.set(clientId, client);
       return client;

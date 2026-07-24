@@ -270,13 +270,35 @@ describe("authorize page", () => {
     expect(html).toContain(challenge); // PKCE round-trips through the form
   });
 
-  it("GET /authorize with an unknown client_id shows an error, no redirect", async () => {
+  it("GET /authorize with an unknown client_id + valid redirect_uri lazily registers and shows the form", async () => {
+    // Clients (e.g. ChatGPT) cache their DCR client_id and do not re-register
+    // after a server restart clears the in-memory store; /authorize must lazily
+    // register a well-formed unknown client_id instead of dead-ending.
+    const { baseUrl } = await startServer();
+    const { challenge } = pkce();
+    const url = new URL(`${baseUrl}/authorize`);
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", "mcp_client_never_registered");
+    url.searchParams.set("redirect_uri", REDIRECT_URI);
+    url.searchParams.set("code_challenge", challenge);
+    url.searchParams.set("code_challenge_method", "S256");
+    const res = await fetch(url, { redirect: "manual" });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain("Connect Tinify");
+    expect(html).toContain('name="api_key"');
+  });
+
+  it("GET /authorize with an unknown client_id + invalid redirect_uri errors, no redirect", async () => {
     const { baseUrl } = await startServer();
     const { challenge } = pkce();
     const url = new URL(`${baseUrl}/authorize`);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", "mcp_client_bogus");
-    url.searchParams.set("redirect_uri", REDIRECT_URI);
+    // Plain http, non-loopback: not an acceptable redirect_uri, so no lazy
+    // registration and no redirect to an unverified URI.
+    url.searchParams.set("redirect_uri", "http://insecure.example/cb");
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
     const res = await fetch(url, { redirect: "manual" });

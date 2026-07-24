@@ -33,8 +33,19 @@ export interface TinifyLikeClient {
     options: ConvertOptions & { filename?: string },
   ): Promise<TinifyResponse<ImageResultData>>;
   usage(): Promise<TinifyResponse<Usage>>;
-  download(resultOrUrl: TinifyResponse<ImageResultData>): Promise<Blob>;
+  download(
+    resultOrUrl: TinifyResponse<ImageResultData>,
+    options?: { signal?: AbortSignal },
+  ): Promise<Blob>;
 }
+
+/**
+ * Timeout for the result-download fetch. The SDK's download() forwards this
+ * signal to fetch, so a stalled result URL fails instead of hanging the tool
+ * (the cause of the "Reviewing your format choices" hang). Kept below nginx's
+ * 120s proxy_read_timeout so the tool returns a clean error, not a 504.
+ */
+export const DOWNLOAD_TIMEOUT_MS = 45_000;
 
 export interface TextResult {
   [key: string]: unknown;
@@ -188,6 +199,14 @@ export function toErrorResult(error: unknown): TextResult {
   }
   if (error instanceof TinifyError) {
     return errorResult(`Tinify.dev client error: ${error.message}`);
+  }
+  if (
+    error instanceof Error &&
+    (error.name === "TimeoutError" || error.name === "AbortError")
+  ) {
+    return errorResult(
+      "The image was processed but fetching the result timed out. Please try again.",
+    );
   }
   return errorResult(
     `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,

@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import {
   changePercent,
+  DOWNLOAD_TIMEOUT_MS,
   formatBytes,
   imageStructuredContent,
   resolveOutputPath,
@@ -72,7 +73,7 @@ export const cropImageTool = {
           filename: path.basename(args.path),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         await writeResult(outputPath, blob);
         return textResult(
           `Cropped ${path.basename(args.path)} to ${args.width}x${args.height}` +

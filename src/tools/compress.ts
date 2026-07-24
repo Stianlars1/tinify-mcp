@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { QualityMode } from "@tinify-dev/client";
 import {
   changePercent,
+  DOWNLOAD_TIMEOUT_MS,
   formatBytes,
   imageStructuredContent,
   resolveOutputPath,
@@ -134,7 +135,7 @@ export const compressImageTool = {
           );
         }
 
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         await writeResult(outputPath, blob);
         const pct = changePercent(data.original_bytes, data.result_bytes);
         const text =

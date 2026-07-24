@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "tinify",
   "display_name": "Tinify image tools",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Compress, resize, crop, and convert images with the Tinify.dev API. Honest results: compression never returns a larger file.",
   "long_description": "Five image tools for Claude: compress_image, resize_image, crop_image, convert_image, and get_usage. Files are processed by the Tinify.dev API (AVIF, WebP, JPEG, PNG), results are written next to your originals - never silently overwriting them - and every response reports real byte counts. Free tier: 500 operations per month, no card required. Limits: 40 MB / 50 megapixels per image; results expire after two hours.",
   "author": {

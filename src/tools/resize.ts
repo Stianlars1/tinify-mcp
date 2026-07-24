@@ -3,6 +3,7 @@ import path from "node:path";
 import { z } from "zod";
 import {
   changePercent,
+  DOWNLOAD_TIMEOUT_MS,
   formatBytes,
   imageStructuredContent,
   resolveOutputPath,
@@ -88,7 +89,7 @@ export const resizeImageTool = {
           filename: path.basename(args.path),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         await writeResult(outputPath, blob);
         const dims =
           data.width !== null && data.height !== null

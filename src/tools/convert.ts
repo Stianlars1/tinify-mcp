@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { QualityMode, TargetFormat } from "@tinify-dev/client";
 import {
   changePercent,
+  DOWNLOAD_TIMEOUT_MS,
   formatBytes,
   imageStructuredContent,
   resolveOutputPath,
@@ -81,7 +82,7 @@ export const convertImageTool = {
           filename: path.basename(args.path),
         });
         const data = result.data;
-        const blob = await client.download(result);
+        const blob = await client.download(result, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
         await writeResult(outputPath, blob);
         return textResult(
           `Converted ${path.basename(args.path)} to ${args.format}: ` +
