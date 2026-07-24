@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-remote/
 *.tsbuildinfo
 .DS_Store
 mcpb-src/server/

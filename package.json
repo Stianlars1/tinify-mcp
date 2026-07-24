@@ -32,6 +32,8 @@
   ],
   "scripts": {
     "build": "tsup",
+    "build:remote": "tsup --config tsup.remote.config.ts",
+    "start:remote": "node dist-remote/http.cjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
