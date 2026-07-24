@@ -3,17 +3,17 @@
   "name": "dev.tinify/mcp",
   "description": "Compress, resize, crop, and convert images with the Tinify.dev API from Claude, Cursor, or any MCP client.",
   "repository": {
-    "url": "https://github.com/tinify-dev/tinify-mcp",
+    "url": "https://github.com/Stianlars1/tinify-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://tinify.dev/developers",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@tinify-dev/mcp",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "transport": {
         "type": "stdio"
       },
