@@ -759,50 +759,101 @@ function renderPage(options: RenderPageOptions): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex,nofollow">
 <title>${escapeHtml(title)}</title>
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; display: flex; align-items: center;
-    justify-content: center; padding: 24px;
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #f5f5f7; color: #1d1d1f;
+  /* Design tokens: set once for light, flipped in the dark media query so
+     every color stays correct regardless of the viewer's theme. */
+  :root {
+    color-scheme: light dark;
+    --bg: #fafafa;
+    --fg: #111111;
+    --muted: #52525b;
+    --card: #ffffff;
+    --border: #e4e4e7;
+    --accent: #6d28d9;
+    --accent-hover: #5b21b6;
+    --ring: rgba(109, 40, 217, 0.35);
+    --input-bg: #ffffff;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.10);
+    --err-bg: #fef2f2;
+    --err-fg: #b42318;
+    --err-border: #fecaca;
   }
   @media (prefers-color-scheme: dark) {
-    body { background: #000; color: #f5f5f7; }
-    .card { background: #1c1c1e; border-color: #2c2c2e; }
-    input { background: #2c2c2e; color: #f5f5f7; border-color: #3a3a3c; }
-    .hint { color: #98989d; }
+    :root {
+      --bg: #09090b;
+      --fg: #fafafa;
+      --muted: #a1a1aa;
+      --card: #131316;
+      --border: #27272a;
+      --accent: #8b5cf6;
+      --accent-hover: #7c3aed;
+      --ring: rgba(139, 92, 246, 0.45);
+      --input-bg: #1c1c20;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      --err-bg: #2a1416;
+      --err-fg: #fca5a5;
+      --err-border: #542426;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px;
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   .card {
-    width: 100%; max-width: 380px; background: #fff; border: 1px solid #e5e5e7;
-    border-radius: 14px; padding: 28px; box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    width: 100%; max-width: 440px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px; box-shadow: var(--shadow);
   }
-  h1 { margin: 0 0 4px; font-size: 20px; }
-  .sub { margin: 0 0 20px; color: #6e6e73; font-size: 14px; }
-  label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+  h1 {
+    margin: 0 0 6px; font-size: 22px; font-weight: 700;
+    letter-spacing: -0.01em; color: var(--fg); opacity: 1;
+  }
+  .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+  label {
+    display: block; font-weight: 600; margin-bottom: 8px;
+    font-size: 13px; color: var(--fg);
+  }
   input {
-    width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid #d2d2d7;
-    border-radius: 9px; background: #fff; color: #1d1d1f;
+    width: 100%; padding: 12px 13px; font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+                 "Liberation Mono", monospace;
+    color: var(--fg); background: var(--input-bg);
+    border: 1px solid var(--border); border-radius: 10px;
+    transition: border-color 140ms ease, box-shadow 140ms ease;
   }
-  input:focus { outline: 2px solid #0071e3; outline-offset: 1px; border-color: #0071e3; }
-  .hint { font-size: 12px; color: #6e6e73; margin: 8px 0 18px; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  input::placeholder { color: var(--muted); opacity: 1; }
+  input:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .hint { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 10px 0 20px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; }
   button {
-    width: 100%; padding: 11px; font-size: 15px; font-weight: 600; color: #fff;
-    background: #0071e3; border: 0; border-radius: 9px; cursor: pointer;
+    width: 100%; padding: 12px; font-size: 15px; font-weight: 600;
+    color: #ffffff; background: var(--accent);
+    border: 0; border-radius: 10px; cursor: pointer;
+    transition: transform 140ms ease, background-color 140ms ease;
   }
-  button:hover { background: #0077ed; }
+  button:hover { background: var(--accent-hover); }
+  button:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+  button:active { transform: scale(0.98); }
   .error {
-    background: #fde8e8; color: #b42318; border: 1px solid #f5c2c0;
-    padding: 10px 12px; border-radius: 9px; font-size: 13px; margin: 0 0 16px;
+    background: var(--err-bg); color: var(--err-fg);
+    border: 1px solid var(--err-border);
+    padding: 11px 13px; border-radius: 10px; font-size: 13px;
+    line-height: 1.45; margin: 0 0 18px;
   }
-  @media (prefers-color-scheme: dark) {
-    .error { background: #3a1a1a; color: #ff8b82; border-color: #5a2626; }
-    .sub { color: #98989d; }
-  }
+  @media (max-width: 480px) { .card { padding: 24px; } }
 </style>
 </head>
 <body>
