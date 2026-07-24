@@ -60,6 +60,29 @@ Create `.cursor/mcp.json` in your project (or `~/.cursor/mcp.json` globally):
 }
 ```
 
+## Remote server (hosted)
+
+The same five tools are available as a hosted streamable-HTTP MCP server - no install, works from ChatGPT connectors, the claude.ai directory, and any registry that expects a URL:
+
+```text
+Endpoint:  https://api.tinify.dev/mcp
+Auth:      Authorization: Bearer tnf_live_...   (or tnf_test_...)
+```
+
+Because the hosted server has no access to your filesystem, the image tools take base64 instead of paths: send `image_base64` (optionally with `filename`), and the result comes back as base64 in `structuredContent.image_base64` plus a text summary with byte counts. Inputs are capped at ~28 MB decoded (the 40 MB API limit minus base64 overhead); URLs are not accepted - the server never fetches remote content. `get_usage` is identical to the local version. Nothing is written to disk on either side.
+
+Try it with curl:
+
+```sh
+curl -s https://api.tinify.dev/mcp \
+  -H "Authorization: Bearer tnf_live_..." \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"0"}}}'
+```
+
+For local files, prefer the stdio server above - it reads and writes them directly with no base64 round-trip and no 28 MB cap.
+
 ## Tools
 
 | Tool | Arguments | Does |

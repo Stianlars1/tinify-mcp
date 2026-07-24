@@ -1,0 +1,46 @@
+# Tinify.dev MCP streamable-HTTP server (stateless, POST /mcp).
+# Install: copy to /etc/systemd/system/tinify-mcp-http.service, then
+#   systemctl daemon-reload && systemctl enable --now tinify-mcp-http
+# The bundle is a single file: /opt/tinify/current/mcp-http/http.cjs
+# (built with `npm run build:remote` -> dist-remote/http.cjs).
+
+[Unit]
+Description=Tinify.dev MCP streamable-HTTP server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tinify
+Group=tinify
+WorkingDirectory=/opt/tinify/current/mcp-http
+Environment=NODE_ENV=production
+Environment=PORT=3102
+# Optional overrides (e.g. TINIFY_BASE_URL for staging); absent file is fine.
+EnvironmentFile=-/etc/tinify/mcp-http.env
+Environment=PATH=/opt/tinify/node-current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
+ExecStart=/opt/tinify/node-current/bin/node /opt/tinify/current/mcp-http/http.cjs
+Restart=on-failure
+RestartSec=5s
+TimeoutStartSec=30s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+KillMode=mixed
+MemoryHigh=384M
+MemoryMax=512M
+TasksMax=128
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tinify-mcp-http
+
+[Install]
+WantedBy=multi-user.target
