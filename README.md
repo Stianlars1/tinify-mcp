@@ -100,3 +100,39 @@ All image tools require **absolute paths** (MCP servers run with an unpredictabl
 ## License
 
 MIT © Stian Larsen
+
+## One-click / one-line installs
+
+**Cursor**: [Add to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=tinify&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkB0aW5pZnktZGV2L21jcCJdLCJlbnYiOnsiVElOSUZZX0FQSV9LRVkiOiJZT1VSX0FQSV9LRVkifX0=) - then set your real key in Cursor's MCP settings.
+
+**VS Code**:
+
+```sh
+code --add-mcp '{"name":"tinify","command":"npx","args":["-y","@tinify-dev/mcp"],"env":{"TINIFY_API_KEY":"tnf_live_..."}}'
+```
+
+**Codex CLI**:
+
+```sh
+codex mcp add tinify --env TINIFY_API_KEY=tnf_live_... -- npx -y @tinify-dev/mcp
+```
+
+or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.tinify]
+command = "npx"
+args = ["-y", "@tinify-dev/mcp"]
+
+[mcp_servers.tinify.env]
+TINIFY_API_KEY = "tnf_live_..."
+```
+
+**Claude Code plugin** (MCP + image-optimization skill):
+
+```
+/plugin marketplace add Stianlars1/tinify-claude-plugin
+/plugin install tinify@tinify
+```
+
+More: https://tinify.dev/mcp
