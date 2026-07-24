@@ -339,15 +339,28 @@ export function createOAuthProvider(
     clientId: string,
     redirectUri: string,
   ): RegisteredClient | null {
-    const client = clients.get(clientId);
+    let client = clients.get(clientId);
     if (client === undefined) {
-      sendHtmlError(
-        res,
-        400,
-        "Unknown client",
-        "This client_id is not registered. Reconnect so the client can register again.",
-      );
-      return null;
+      // Lazily register an unknown client_id. Our store is in-memory, and
+      // clients like ChatGPT cache their DCR client_id keyed to the MCP URL and
+      // do NOT re-register after a server restart clears the store - so removing
+      // and re-adding the connector replays the same forgotten client_id and
+      // dead-ends. Since /register is already open, accepting a well-formed
+      // client_id + redirect_uri here is no weaker than DCR, and PKCE plus the
+      // user's own key at consent still gate the token exchange.
+      if (!isValidRedirectUri(redirectUri)) {
+        sendHtmlError(
+          res,
+          400,
+          "Invalid redirect_uri",
+          "The redirect_uri must be an absolute https (or loopback/custom-scheme) URL.",
+        );
+        return null;
+      }
+      if (clients.size >= MAX_STORED_ENTRIES) sweepExpired();
+      client = { clientId, redirectUris: [redirectUri], createdAt: Date.now() };
+      clients.set(clientId, client);
+      return client;
     }
     if (!client.redirectUris.includes(redirectUri)) {
       sendHtmlError(
