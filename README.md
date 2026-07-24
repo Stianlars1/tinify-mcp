@@ -66,8 +66,14 @@ The same five tools are available as a hosted streamable-HTTP MCP server - no in
 
 ```text
 Endpoint:  https://api.tinify.dev/mcp
-Auth:      Authorization: Bearer tnf_live_...   (or tnf_test_...)
+Auth:      OAuth 2.1 (PKCE + dynamic client registration), or
+           Authorization: Bearer tnf_live_...   (or tnf_test_...)
 ```
+
+Two ways to authenticate:
+
+- **OAuth (for connectors)** - ChatGPT connectors and the claude.ai directory only speak "OAuth" or "no auth". Add the server by its URL (`https://api.tinify.dev/mcp`) and pick **OAuth**; the client discovers the authorization and token endpoints automatically from the server's `.well-known` metadata, registers itself, and opens a **Connect Tinify** page where you paste your Tinify API key. Your key stays the credential - the client only ever holds an opaque token that maps back to it server-side.
+- **Direct bearer (for scripts/CLIs)** - send `Authorization: Bearer tnf_live_...` (or `tnf_test_...`) and skip OAuth entirely. Unchanged.
 
 Because the hosted server has no access to your filesystem, the image tools take base64 instead of paths: send `image_base64` (optionally with `filename`), and the result comes back as base64 in `structuredContent.image_base64` plus a text summary with byte counts. Inputs are capped at ~28 MB decoded (the 40 MB API limit minus base64 overhead); URLs are not accepted - the server never fetches remote content. `get_usage` is identical to the local version. Nothing is written to disk on either side.
 

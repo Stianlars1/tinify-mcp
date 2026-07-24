@@ -7,6 +7,8 @@ import {
 import { pathToFileURL } from "node:url";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { TinifyClient } from "@tinify-dev/client";
+import { API_KEY_PATTERN, extractBearerToken } from "./auth-shared.js";
+import { createOAuthProvider, type OAuthProvider } from "./oauth.js";
 import { createServer } from "./server.js";
 import { REMOTE_INSTRUCTIONS, remoteTools } from "./tools/remote.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
@@ -22,9 +24,6 @@ import type { TinifyLikeClient } from "./tools/shared.js";
  */
 
 export const DEFAULT_PORT = 3102;
-
-/** tnf_live_* or tnf_test_* followed by at least one key character. */
-const API_KEY_PATTERN = /^tnf_(?:live|test)_[A-Za-z0-9._-]+$/;
 
 /**
  * Hard cap on the request body. Generous headroom above the 28 MB decoded
@@ -83,27 +82,70 @@ function jsonRpcError(code: number, message: string): unknown {
   return { jsonrpc: "2.0", error: { code, message }, id: null };
 }
 
-function sendUnauthorized(res: ServerResponse): void {
+function sendUnauthorized(
+  res: ServerResponse,
+  wwwAuthenticate: string,
+): void {
   sendJson(
     res,
     401,
     jsonRpcError(
       -32001,
-      "Unauthorized: send Authorization: Bearer tnf_live_... (or tnf_test_...). Create a key at https://tinify.dev/developers.",
+      "Unauthorized: connect with OAuth, or send Authorization: Bearer tnf_live_... (or tnf_test_...). Create a key at https://tinify.dev/developers.",
     ),
-    { "WWW-Authenticate": 'Bearer realm="tinify", error="invalid_token"' },
+    { "WWW-Authenticate": wwwAuthenticate },
   );
+}
+
+/**
+ * Derives this server's public origin (scheme + host, no trailing slash) so
+ * OAuth metadata advertises reachable URLs. Behind nginx the Host header is
+ * preserved and X-Forwarded-Proto is set to https; a PUBLIC_BASE_URL env var
+ * overrides both. In tests the loopback Host yields http://127.0.0.1:<port>.
+ */
+export function getBaseUrl(req: IncomingMessage): string {
+  const envUrl = process.env["PUBLIC_BASE_URL"];
+  if (envUrl !== undefined && envUrl !== "") {
+    return envUrl.replace(/\/+$/, "");
+  }
+  const host = req.headers.host ?? `127.0.0.1:${DEFAULT_PORT}`;
+  const forwarded = req.headers["x-forwarded-proto"];
+  const forwardedProto = Array.isArray(forwarded)
+    ? forwarded[0]
+    : (forwarded ?? "").split(",")[0]?.trim();
+  const isLoopback = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
+  const proto =
+    forwardedProto !== undefined && forwardedProto !== ""
+      ? forwardedProto
+      : isLoopback
+        ? "http"
+        : "https";
+  return `${proto}://${host}`;
 }
 
 /** Extracts a valid Tinify API key from the Authorization header, or null. */
 export function extractApiKey(
   authorization: string | undefined,
 ): string | null {
-  if (authorization === undefined) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  if (match === null) return null;
-  const key = (match[1] ?? "").trim();
-  return API_KEY_PATTERN.test(key) ? key : null;
+  const token = extractBearerToken(authorization);
+  if (token === null) return null;
+  return API_KEY_PATTERN.test(token) ? token : null;
+}
+
+/**
+ * Resolves the per-request Tinify key from the Authorization header, accepting
+ * EITHER a direct tnf_ key (unchanged behavior) OR an opaque OAuth access
+ * token that maps server-side to a stored tnf_ key.
+ */
+function resolveApiKey(
+  authorization: string | undefined,
+  oauth: OAuthProvider,
+): string | null {
+  const direct = extractApiKey(authorization);
+  if (direct !== null) return direct;
+  const token = extractBearerToken(authorization);
+  if (token === null) return null;
+  return oauth.resolveAccessToken(token);
 }
 
 class BodyTooLargeError extends Error {}
@@ -131,10 +173,12 @@ async function handleMcpPost(
   req: IncomingMessage,
   res: ServerResponse,
   clientFactory: (apiKey: string) => TinifyLikeClient,
+  oauth: OAuthProvider,
+  baseUrl: string,
 ): Promise<void> {
-  const apiKey = extractApiKey(req.headers.authorization);
+  const apiKey = resolveApiKey(req.headers.authorization, oauth);
   if (apiKey === null) {
-    sendUnauthorized(res);
+    sendUnauthorized(res, oauth.wwwAuthenticate(baseUrl));
     return;
   }
 
@@ -186,16 +230,19 @@ async function handleMcpPost(
  */
 export function createHttpServer(options: HttpServerOptions = {}): Server {
   const clientFactory = options.clientFactory ?? defaultClientFactory;
+  const oauth = createOAuthProvider({ clientFactory });
   return createNodeHttpServer((req, res) => {
     const method = req.method ?? "GET";
-    const pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const pathname = url.pathname;
 
     if (pathname === "/healthz" && (method === "GET" || method === "HEAD")) {
       sendJson(res, 200, { ok: true });
       return;
     }
 
-    if (pathname !== "/mcp") {
+    const isOAuth = oauth.isOAuthPath(pathname);
+    if (pathname !== "/mcp" && !isOAuth) {
       sendJson(res, 404, jsonRpcError(-32601, `Not found: ${pathname}. The MCP endpoint is POST /mcp.`));
       return;
     }
@@ -205,6 +252,24 @@ export function createHttpServer(options: HttpServerOptions = {}): Server {
     if (method === "OPTIONS") {
       res.writeHead(204);
       res.end();
+      return;
+    }
+
+    if (isOAuth) {
+      const baseUrl = getBaseUrl(req);
+      oauth
+        .handle({ req, res, method, pathname, url, baseUrl })
+        .catch((error: unknown) => {
+          console.error(
+            "tinify-mcp-http: oauth request failed:",
+            error instanceof Error ? error.message : error,
+          );
+          if (!res.headersSent) {
+            sendJson(res, 500, { error: "server_error" });
+          } else {
+            res.end();
+          }
+        });
       return;
     }
 
@@ -221,17 +286,20 @@ export function createHttpServer(options: HttpServerOptions = {}): Server {
       return;
     }
 
-    handleMcpPost(req, res, clientFactory).catch((error: unknown) => {
-      console.error(
-        "tinify-mcp-http: request failed:",
-        error instanceof Error ? error.message : error,
-      );
-      if (!res.headersSent) {
-        sendJson(res, 500, jsonRpcError(-32603, "Internal server error."));
-      } else {
-        res.end();
-      }
-    });
+    const baseUrl = getBaseUrl(req);
+    handleMcpPost(req, res, clientFactory, oauth, baseUrl).catch(
+      (error: unknown) => {
+        console.error(
+          "tinify-mcp-http: request failed:",
+          error instanceof Error ? error.message : error,
+        );
+        if (!res.headersSent) {
+          sendJson(res, 500, jsonRpcError(-32603, "Internal server error."));
+        } else {
+          res.end();
+        }
+      },
+    );
   });
 }
 
@@ -254,7 +322,7 @@ if (isDirectRun()) {
   const server = createHttpServer();
   server.listen(port, "127.0.0.1", () => {
     console.error(
-      `tinify-mcp-http: streamable HTTP listening on 127.0.0.1:${port} (POST /mcp, GET /healthz, 5 tools, stateless)`,
+      `tinify-mcp-http: streamable HTTP listening on 127.0.0.1:${port} (POST /mcp, GET /healthz, OAuth 2.1 at /authorize /token /register /.well-known/*, 5 tools, stateless)`,
     );
   });
   const shutdown = (): void => {

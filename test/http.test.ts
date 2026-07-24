@@ -173,9 +173,13 @@ describe("remote HTTP server", () => {
       body: JSON.stringify(initializeBody()),
     });
     expect(res.status).toBe(401);
-    expect(res.headers.get("www-authenticate")).toBe(
-      'Bearer realm="tinify", error="invalid_token"',
+    // MCP clients discover the OAuth flow from resource_metadata (RFC 9728).
+    const wwwAuth = res.headers.get("www-authenticate") ?? "";
+    expect(wwwAuth).toContain("invalid_token");
+    expect(wwwAuth).toContain(
+      'resource_metadata="http://127.0.0.1',
     );
+    expect(wwwAuth).toContain("/.well-known/oauth-protected-resource");
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     const body = (await res.json()) as {
       jsonrpc: string;

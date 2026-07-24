@@ -16,6 +16,9 @@ Group=tinify
 WorkingDirectory=/opt/tinify/current/mcp-http
 Environment=NODE_ENV=production
 Environment=PORT=3102
+# Pin the OAuth issuer/endpoint origin so the /.well-known metadata and token
+# issuer never depend on a (spoofable) Host header. Must match the public URL.
+Environment=PUBLIC_BASE_URL=https://api.tinify.dev
 # Optional overrides (e.g. TINIFY_BASE_URL for staging); absent file is fine.
 EnvironmentFile=-/etc/tinify/mcp-http.env
 Environment=PATH=/opt/tinify/node-current/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/bin
