@@ -7,7 +7,7 @@ import { getUsageTool } from "./tools/usage.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
 
 export const SERVER_NAME = "tinify";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.1.2";
 
 const STDIO_INSTRUCTIONS =
   "Tools for the Tinify.dev image API: compress, resize, crop, and convert local images, plus account usage. Image paths must be absolute. Results are written as <name>.min.<ext> next to the input unless output_path is given; source files are never overwritten silently.";

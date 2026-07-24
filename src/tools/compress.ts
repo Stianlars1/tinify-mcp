@@ -88,6 +88,13 @@ export const compressImageTool = {
       overwrite: overwriteSchema.optional(),
     },
     outputSchema: imageOutputShape,
+    annotations: {
+      title: "Compress image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: CompressImageArgs): Promise<TextResult> => {

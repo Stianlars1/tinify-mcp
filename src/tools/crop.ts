@@ -46,6 +46,13 @@ export const cropImageTool = {
       overwrite: overwriteSchema.optional(),
     },
     outputSchema: imageOutputShape,
+    annotations: {
+      title: "Crop image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: CropImageArgs): Promise<TextResult> => {

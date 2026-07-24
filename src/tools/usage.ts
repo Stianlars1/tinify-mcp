@@ -23,6 +23,13 @@ export const getUsageTool = {
       remaining: z.number(),
       request_id: z.string(),
     },
+    annotations: {
+      title: "Get usage",
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (): Promise<TextResult> => {

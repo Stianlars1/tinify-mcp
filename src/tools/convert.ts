@@ -54,6 +54,13 @@ export const convertImageTool = {
       overwrite: overwriteSchema.optional(),
     },
     outputSchema: imageOutputShape,
+    annotations: {
+      title: "Convert image format",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: ConvertImageArgs): Promise<TextResult> => {

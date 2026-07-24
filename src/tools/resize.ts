@@ -51,6 +51,13 @@ export const resizeImageTool = {
       overwrite: overwriteSchema.optional(),
     },
     outputSchema: imageOutputShape,
+    annotations: {
+      title: "Resize image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: ResizeImageArgs): Promise<TextResult> => {

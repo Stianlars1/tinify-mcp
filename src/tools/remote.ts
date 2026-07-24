@@ -217,6 +217,13 @@ export const remoteCompressImageTool = {
         ),
     },
     outputSchema: remoteImageOutputShape,
+    annotations: {
+      title: "Compress image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: RemoteCompressImageArgs): Promise<TextResult> => {
@@ -309,6 +316,13 @@ export const remoteResizeImageTool = {
       keep_aspect_ratio: z.boolean().optional(),
     },
     outputSchema: remoteImageOutputShape,
+    annotations: {
+      title: "Resize image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: RemoteResizeImageArgs): Promise<TextResult> => {
@@ -391,6 +405,13 @@ export const remoteCropImageTool = {
       height: z.number().int().positive().describe("Crop height in pixels."),
     },
     outputSchema: remoteImageOutputShape,
+    annotations: {
+      title: "Crop image",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: RemoteCropImageArgs): Promise<TextResult> => {
@@ -449,6 +470,13 @@ export const remoteConvertImageTool = {
       quality_mode: qualityModeSchema.optional(),
     },
     outputSchema: remoteImageOutputShape,
+    annotations: {
+      title: "Convert image format",
+      readOnlyHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+      openWorldHint: true,
+    },
   },
   makeHandler(client: TinifyLikeClient) {
     return async (args: RemoteConvertImageArgs): Promise<TextResult> => {
