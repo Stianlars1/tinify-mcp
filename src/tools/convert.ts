@@ -21,7 +21,7 @@ import {
   pathSchema,
 } from "./compress.js";
 
-const FORMAT_EXTENSIONS: Record<TargetFormat, string> = {
+export const FORMAT_EXTENSIONS: Record<TargetFormat, string> = {
   avif: ".avif",
   webp: ".webp",
   jpeg: ".jpg",

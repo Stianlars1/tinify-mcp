@@ -9,6 +9,16 @@ import type { TinifyLikeClient } from "./tools/shared.js";
 export const SERVER_NAME = "tinify";
 export const SERVER_VERSION = "0.1.0";
 
+const STDIO_INSTRUCTIONS =
+  "Tools for the Tinify.dev image API: compress, resize, crop, and convert local images, plus account usage. Image paths must be absolute. Results are written as <name>.min.<ext> next to the input unless output_path is given; source files are never overwritten silently.";
+
+/** Shape every registerable tool module exports. */
+export interface RegisterableTool {
+  name: string;
+  config: unknown;
+  makeHandler(client: TinifyLikeClient): unknown;
+}
+
 export const allTools = [
   compressImageTool,
   resizeImageTool,
@@ -17,15 +27,21 @@ export const allTools = [
   getUsageTool,
 ] as const;
 
-export function createServer(client: TinifyLikeClient): McpServer {
+/**
+ * Builds an McpServer wired to the given client. Defaults to the stdio
+ * (local-filesystem) toolset; the remote HTTP entry passes the base64
+ * toolset and its own instructions instead.
+ */
+export function createServer(
+  client: TinifyLikeClient,
+  tools: readonly RegisterableTool[] = allTools,
+  instructions: string = STDIO_INSTRUCTIONS,
+): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    {
-      instructions:
-        "Tools for the Tinify.dev image API: compress, resize, crop, and convert local images, plus account usage. Image paths must be absolute. Results are written as <name>.min.<ext> next to the input unless output_path is given; source files are never overwritten silently.",
-    },
+    { instructions },
   );
-  for (const tool of allTools) {
+  for (const tool of tools) {
     server.registerTool(
       tool.name,
       tool.config as never,
