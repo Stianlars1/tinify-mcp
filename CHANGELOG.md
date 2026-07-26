@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-26
+
+### Changed
+
+- **Starting without `TINIFY_API_KEY` no longer exits.** The server completes
+  the MCP handshake and registers its tools; calling one returns the
+  "create a key" instruction as a tool result. Previously the process exited 1
+  before the handshake, so MCP clients showed only a failed connection and the
+  explanation — written to stderr on an already-dead process — never reached
+  the user. This is the state anyone is in immediately after installing the
+  Claude Code plugin but before exporting a key. The message is still printed
+  to stderr at startup for people running the binary directly.
+
+### Added
+
+- `repository`, `homepage`, and `bugs` in `package.json`, so the npm page links
+  back to the source and to tinify.dev.
+
 ## [0.1.0] - 2026-07-24
 
 ### Added

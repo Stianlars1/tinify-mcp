@@ -7,7 +7,7 @@ import { getUsageTool } from "./tools/usage.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
 
 export const SERVER_NAME = "tinify";
-export const SERVER_VERSION = "0.1.4";
+export const SERVER_VERSION = "0.1.5";
 
 // Human-facing serverInfo (MCP 2025-11-25 Implementation fields). Clients that
 // render connector branding (title/website/icon) read these off the initialize

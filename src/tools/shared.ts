@@ -13,6 +13,7 @@ import {
   type TinifyResponse,
   type Usage,
 } from "@tinify-dev/client";
+import { MissingApiKeyError } from "../config.js";
 
 /** The subset of the SDK client the tools use; tests inject a fake. */
 export interface TinifyLikeClient {
@@ -185,6 +186,11 @@ export function errorResult(text: string): TextResult {
 
 /** Maps any thrown error to an honest, actionable isError result. */
 export function toErrorResult(error: unknown): TextResult {
+  // Verbatim and first: this one is a setup instruction, not a failure report,
+  // so it must not be wrapped in "Unexpected error:".
+  if (error instanceof MissingApiKeyError) {
+    return errorResult(error.message);
+  }
   if (error instanceof ToolInputError) {
     return errorResult(error.message);
   }

@@ -10,6 +10,18 @@ export class ConfigError extends Error {
   }
 }
 
+/**
+ * Thrown by the unconfigured client when a tool is called without an API key.
+ * Distinct from {@link ConfigError} because this one is rendered back to the
+ * user through the MCP channel rather than printed to stderr at startup.
+ */
+export class MissingApiKeyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MissingApiKeyError";
+  }
+}
+
 const MISSING_KEY_MESSAGE = [
   "tinify-mcp: TINIFY_API_KEY is not set.",
   "",
@@ -43,4 +55,26 @@ export function loadConfig(env: Record<string, string | undefined>): McpConfig {
   return baseUrl !== undefined && baseUrl !== ""
     ? { apiKey, baseUrl }
     : { apiKey };
+}
+
+/** The message shown when the key is absent, for stderr and for tool results. */
+export const missingApiKeyMessage = MISSING_KEY_MESSAGE;
+
+/**
+ * Same read as {@link loadConfig}, but reports a missing key instead of
+ * throwing, so the server can still complete the MCP handshake and explain
+ * itself in-band. Exiting at startup leaves MCP clients showing nothing but a
+ * failed connection - the stderr text above never reaches the person who
+ * needs it.
+ */
+export function readConfig(env: Record<string, string | undefined>): {
+  apiKey?: string;
+  baseUrl?: string;
+} {
+  const apiKey = env["TINIFY_API_KEY"];
+  const baseUrl = env["TINIFY_BASE_URL"];
+  return {
+    ...(apiKey !== undefined && apiKey.trim() !== "" ? { apiKey } : {}),
+    ...(baseUrl !== undefined && baseUrl !== "" ? { baseUrl } : {}),
+  };
 }

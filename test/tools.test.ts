@@ -16,7 +16,13 @@ import { resizeImageTool } from "../src/tools/resize.js";
 import { getUsageTool } from "../src/tools/usage.js";
 import type { TinifyLikeClient } from "../src/tools/shared.js";
 import { allTools } from "../src/server.js";
-import { ConfigError, loadConfig } from "../src/config.js";
+import {
+  ConfigError,
+  MissingApiKeyError,
+  loadConfig,
+  readConfig,
+} from "../src/config.js";
+import { createUnconfiguredClient } from "../src/unconfigured-client.js";
 
 const RESULT_BYTES = new Uint8Array([1, 2, 3, 4, 5]);
 
@@ -385,5 +391,44 @@ describe("config", () => {
     expect(
       loadConfig({ TINIFY_API_KEY: "tnf_test_x", TINIFY_BASE_URL: "http://localhost:8080" }),
     ).toEqual({ apiKey: "tnf_test_x", baseUrl: "http://localhost:8080" });
+  });
+
+  it("readConfig reports a missing key instead of throwing", () => {
+    // The server has to survive this: exiting here is what left MCP clients
+    // showing a failed connection and no reason for it.
+    expect(readConfig({})).toEqual({});
+    expect(readConfig({ TINIFY_API_KEY: "  " })).toEqual({});
+    expect(readConfig({ TINIFY_API_KEY: "tnf_test_x" })).toEqual({
+      apiKey: "tnf_test_x",
+    });
+    expect(
+      readConfig({ TINIFY_API_KEY: "tnf_test_x", TINIFY_BASE_URL: "http://x" }),
+    ).toEqual({ apiKey: "tnf_test_x", baseUrl: "http://x" });
+  });
+});
+
+describe("unconfigured client", () => {
+  it("refuses every operation with the setup instruction", async () => {
+    const client = createUnconfiguredClient();
+    const calls: Array<() => unknown> = [
+      () => client.usage(),
+      () => client.compress(new Uint8Array([1])),
+      () => client.resize(new Uint8Array([1])),
+      () => client.crop(new Uint8Array([1]), { x: 0, y: 0, width: 1, height: 1 }),
+      () => client.convert(new Uint8Array([1]), { format: "webp" }),
+    ];
+    for (const call of calls) {
+      expect(call).toThrow(MissingApiKeyError);
+      expect(call).toThrow(/TINIFY_API_KEY is not set/);
+    }
+  });
+
+  it("surfaces the instruction through a real tool call, not as a crash", async () => {
+    const result = await getUsageTool.makeHandler(createUnconfiguredClient())();
+    expect(result.isError).toBe(true);
+    // Verbatim - not wrapped in "Unexpected error:".
+    expect(result.content[0]?.text).toContain("TINIFY_API_KEY is not set");
+    expect(result.content[0]?.text).toContain("tinify.dev/developers");
+    expect(result.content[0]?.text).not.toContain("Unexpected error");
   });
 });
