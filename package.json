@@ -1,6 +1,6 @@
 {
   "name": "@tinify-dev/mcp",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "MCP server for the Tinify.dev image API: compress, resize, crop, and convert images from ChatGPT, Claude, Cursor, or any MCP client.",
   "license": "MIT",
   "author": "Stian Larsen",

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-05
+
+### Changed
+
+- Releases are published through npm trusted publishing (OIDC) with
+  provenance - no long-lived npm token exists anywhere in the pipeline.
+- The Claude Desktop bundle (.mcpb) is built, validated, and attached to the
+  GitHub release automatically on every tag, so it can no longer lag behind
+  the npm version. No runtime changes to the server or tools.
+
 ## [0.1.6] - 2026-08-05
 
 ### Added
