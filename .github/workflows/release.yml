@@ -27,3 +27,37 @@ jobs:
       - run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  mcpb:
+    # Packs the Claude Desktop bundle and attaches it to a GitHub release,
+    # so the .mcpb download can never lag behind the npm version again.
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build:mcpb
+      - name: Check manifest version matches the tag
+        run: |
+          MANIFEST=$(node -p "require('./mcpb-src/manifest.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$MANIFEST" != "$TAG" ]; then
+            echo "mcpb-src/manifest.json is $MANIFEST but the tag is $TAG" >&2
+            exit 1
+          fi
+      - run: npx -y @anthropic-ai/mcpb validate mcpb-src/manifest.json
+      - run: npx -y @anthropic-ai/mcpb pack mcpb-src "tinify-${GITHUB_REF_NAME#v}.mcpb"
+      - name: Create GitHub release with the bundle
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "@tinify-dev/mcp $GITHUB_REF_NAME" \
+            --notes "See CHANGELOG.md for details. The .mcpb below installs the server in Claude Desktop (drag it onto the app)." \
+            "tinify-${GITHUB_REF_NAME#v}.mcpb"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
