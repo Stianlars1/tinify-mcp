@@ -14,11 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # No registry-url here: it writes an .npmrc _authToken line that expands
+      # an unset NODE_AUTH_TOKEN to an empty token, which preempts the OIDC
+      # trusted-publishing exchange and turns the publish into a 404.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
