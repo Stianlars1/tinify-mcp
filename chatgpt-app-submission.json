@@ -1,0 +1,140 @@
+{
+  "$schema": "https://developers.openai.com/apps-sdk/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "Tinify",
+    "subtitle": "Compress and convert images",
+    "description": "Tinify helps users compress, resize, crop, and convert attached PNG, JPEG, WebP, and AVIF images. It returns the processed image through a temporary download link with exact before-and-after byte counts, dimensions when available, and an honest optimized status.",
+    "category": "PRODUCTIVITY"
+  },
+  "tools": {
+    "compress_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Uploads the attached image and creates a private, expiring Tinify processing result that consumes one account operation.",
+        "open_world_justification": "The result remains private and temporary and cannot publish or change publicly visible internet content.",
+        "destructive_justification": "Does not delete or overwrite the user's original image or any persistent account data."
+      }
+    },
+    "resize_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Uploads the attached image and creates a private, expiring resized result that consumes one account operation.",
+        "open_world_justification": "The resized result remains private and temporary and is not published to the public internet.",
+        "destructive_justification": "Does not replace or delete the user's original image or other persistent data."
+      }
+    },
+    "crop_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Uploads the attached image and creates a private, expiring cropped result that consumes one account operation.",
+        "open_world_justification": "The cropped result remains private and temporary and cannot alter publicly visible content.",
+        "destructive_justification": "Does not overwrite or delete the original image or any persistent user data."
+      }
+    },
+    "convert_image": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Uploads the attached image and creates a private, expiring converted result that consumes one account operation.",
+        "open_world_justification": "The converted result remains private and temporary and is not published to an external audience.",
+        "destructive_justification": "Does not overwrite or delete the original image or other persistent account data."
+      }
+    },
+    "get_usage": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Only retrieves the authenticated Tinify account's current plan and operation usage.",
+        "open_world_justification": "Does not create, send, publish, or change content in any external system.",
+        "destructive_justification": "Does not delete, overwrite, revoke, or otherwise mutate account data."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Compress an attached PNG and report exact savings.",
+      "user_prompt": "Use Tinify to compress this attached PNG for the web. Show the original size, result size, and percentage saved.",
+      "file_attachment_urls": null,
+      "tools_triggered": "compress_image",
+      "expected_output": "Returns original and result byte counts, the percentage change, optimized status, and a temporary result download link; if the image cannot be reduced, clearly says to keep the original.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Resize an attached JPEG to an exact width.",
+      "user_prompt": "Resize this attached JPEG to 1200 pixels wide while keeping its aspect ratio, and report the final dimensions and size change.",
+      "file_attachment_urls": null,
+      "tools_triggered": "resize_image",
+      "expected_output": "Returns a 1200-pixel-wide result with final dimensions, before-and-after byte counts, percentage change, and a temporary download link.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Crop an attached screenshot to a specified rectangle.",
+      "user_prompt": "Crop this attached screenshot from x 0 and y 0 to a 1200 by 630 pixel rectangle.",
+      "file_attachment_urls": null,
+      "tools_triggered": "crop_image",
+      "expected_output": "Returns the cropped image through a temporary download link and reports the crop rectangle and byte-size change.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Convert an attached PNG to WebP.",
+      "user_prompt": "Convert this attached PNG to WebP using best quality and tell me whether the result is smaller.",
+      "file_attachment_urls": null,
+      "tools_triggered": "convert_image",
+      "expected_output": "Returns a WebP result link with the suggested file name, exact before-and-after byte counts, and percentage change, including an honest increase if the result is larger.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Retrieve the authenticated account's usage.",
+      "user_prompt": "How many Tinify operations have I used and how many remain in the current billing period?",
+      "file_attachment_urls": null,
+      "tools_triggered": "get_usage",
+      "expected_output": "Returns the plan, billing period, included operations, used operations, and remaining operations.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Do not invoke image tools for unsupported PDF compression.",
+      "user_prompt": "Compress this attached PDF with Tinify.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Explains that Tinify supports PNG, JPEG, WebP, and AVIF images and does not invoke a tool for the PDF.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not invoke Tinify for image generation.",
+      "user_prompt": "Generate a new watercolor landscape image from this description.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Tinify because the app processes existing images and does not generate new images.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not fetch an arbitrary image URL as an attachment substitute.",
+      "user_prompt": "Compress the image at https://example.com/photo.png with Tinify.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Asks the user to attach the image instead of invoking Tinify with an arbitrary remote URL.",
+      "expected_output_url": null
+    }
+  ]
+}

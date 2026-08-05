@@ -33,6 +33,7 @@ function makeMockFetch(): {
               result_bytes: 99_430,
               width: 1200,
               height: 800,
+              result_format: "png",
               download_url: "https://api.tinify.dev/dl/http-test",
               expires_at: "2026-07-24T12:00:00Z",
             },
@@ -75,6 +76,7 @@ interface TestContext {
   baseUrl: string;
   server: Server;
   calls: string[];
+  fileCalls: Array<{ url: string; init?: RequestInit }>;
   seenApiKeys: string[];
 }
 
@@ -82,11 +84,31 @@ let running: Server | undefined;
 
 async function startServer(): Promise<TestContext> {
   const { fetch: mockFetch, calls } = makeMockFetch();
+  const fileCalls: Array<{ url: string; init?: RequestInit }> = [];
+  const fileFetch = vi.fn(
+    async (
+      input: string | URL | Request,
+      init?: RequestInit,
+    ): Promise<Response> => {
+      fileCalls.push({ url: String(input), ...(init !== undefined ? { init } : {}) });
+      return new Response(TINY_PNG.slice().buffer as ArrayBuffer, {
+        status: 200,
+        headers: {
+          "content-type": "image/png",
+          "content-length": String(TINY_PNG.byteLength),
+        },
+      });
+    },
+  );
   const seenApiKeys: string[] = [];
   const server = createHttpServer({
     clientFactory: (apiKey) => {
       seenApiKeys.push(apiKey);
       return new TinifyClient({ apiKey, fetch: mockFetch });
+    },
+    remoteFiles: {
+      fetch: fileFetch,
+      resolveHostname: async () => ["93.184.216.34"],
     },
   });
   await new Promise<void>((resolve) =>
@@ -94,10 +116,17 @@ async function startServer(): Promise<TestContext> {
   );
   running = server;
   const { port } = server.address() as AddressInfo;
-  return { baseUrl: `http://127.0.0.1:${port}`, server, calls, seenApiKeys };
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    server,
+    calls,
+    fileCalls,
+    seenApiKeys,
+  };
 }
 
 afterEach(async () => {
+  vi.unstubAllEnvs();
   if (running !== undefined) {
     await new Promise<void>((resolve) => running?.close(() => resolve()));
     running = undefined;
@@ -160,6 +189,22 @@ describe("remote HTTP server", () => {
     const res = await fetch(`${baseUrl}/healthz`);
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });
+  });
+
+  it("serves the exact OpenAI domain challenge only when configured", async () => {
+    const { baseUrl } = await startServer();
+    const missing = await fetch(
+      `${baseUrl}/.well-known/openai-apps-challenge`,
+    );
+    expect(missing.status).toBe(404);
+
+    vi.stubEnv("OPENAI_APPS_CHALLENGE_TOKEN", "openai-test-token");
+    const configured = await fetch(
+      `${baseUrl}/.well-known/openai-apps-challenge`,
+    );
+    expect(configured.status).toBe(200);
+    expect(configured.headers.get("content-type")).toContain("text/plain");
+    expect(await configured.text()).toBe("openai-test-token");
   });
 
   it("rejects POST /mcp without Authorization: 401 + WWW-Authenticate + CORS", async () => {
@@ -243,7 +288,25 @@ describe("remote HTTP server", () => {
     });
     expect(listRes.status).toBe(200);
     const list = (await listRes.json()) as {
-      result: { tools: Array<{ name: string; description?: string }> };
+      result: {
+        tools: Array<{
+          name: string;
+          description?: string;
+          inputSchema?: {
+            properties?: Record<string, {
+              properties?: Record<string, unknown>;
+              required?: string[];
+            }>;
+          };
+          outputSchema?: Record<string, unknown>;
+          annotations?: {
+            readOnlyHint?: boolean;
+            openWorldHint?: boolean;
+            destructiveHint?: boolean;
+          };
+          _meta?: Record<string, unknown>;
+        }>;
+      };
     };
     expect(list.result.tools.map((tool) => tool.name).sort()).toEqual([
       "compress_image",
@@ -256,6 +319,31 @@ describe("remote HTTP server", () => {
       (tool) => tool.name === "compress_image",
     );
     expect(compress?.description).toContain("base64");
+    for (const tool of list.result.tools) {
+      expect(tool.outputSchema, `${tool.name} outputSchema`).toBeDefined();
+      expect(tool.annotations?.readOnlyHint).toBe(
+        tool.name === "get_usage",
+      );
+      expect(tool.annotations?.openWorldHint).toBe(false);
+      expect(tool.annotations?.destructiveHint).toBe(false);
+      expect(tool._meta?.["securitySchemes"]).toEqual([
+        { type: "oauth2", scopes: ["tinify:use"] },
+      ]);
+      expect(tool._meta?.["openai/fileParams"]).toEqual(
+        tool.name === "get_usage" ? undefined : ["image"],
+      );
+    }
+    const imageSchema = compress?.inputSchema?.properties?.["image"];
+    expect(Object.keys(imageSchema?.properties ?? {}).sort()).toEqual([
+      "download_url",
+      "file_id",
+      "file_name",
+      "mime_type",
+    ]);
+    expect(imageSchema?.required?.sort()).toEqual([
+      "download_url",
+      "file_id",
+    ]);
   });
 
   it("compress_image round-trip: base64 in, base64 out, per-request API key", async () => {
@@ -287,14 +375,105 @@ describe("remote HTTP server", () => {
       change_percent: -68.9,
       optimized: true,
       image_base64: Buffer.from(RESULT_BYTES).toString("base64"),
+      download_url: "https://api.tinify.dev/dl/http-test",
+      expires_at: "2026-07-24T12:00:00Z",
+      mime_type: "image/png",
       filename: "photo.min.png",
       request_id: "req_http_1",
+    });
+    expect(body.result.content[1]).toMatchObject({
+      type: "resource_link",
+      uri: "https://api.tinify.dev/dl/http-test",
+      name: "photo.min.png",
+      mimeType: "image/png",
+      size: 99_430,
     });
     // The bearer key became the per-request TinifyClient key.
     expect(seenApiKeys).toEqual([TEST_KEY]);
     expect(calls.some((url) => url.includes("/api/v1/images/compress"))).toBe(
       true,
     );
+  });
+
+  it("compress_image accepts a ChatGPT file attachment and returns a result link without base64 bloat", async () => {
+    const { baseUrl, calls, fileCalls } = await startServer();
+    const res = await rpc(baseUrl, {
+      jsonrpc: "2.0",
+      id: 31,
+      method: "tools/call",
+      params: {
+        name: "compress_image",
+        arguments: {
+          image: {
+            download_url: "https://files.openai.example/input/photo.png",
+            file_id: "file_test_photo",
+            mime_type: "image/png",
+            file_name: "photo.png",
+          },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      result: {
+        isError?: boolean;
+        content: Array<Record<string, unknown>>;
+        structuredContent: Record<string, unknown>;
+      };
+    };
+    expect(body.result.isError).toBeUndefined();
+    expect(fileCalls).toHaveLength(1);
+    expect(fileCalls[0]?.url).toBe(
+      "https://files.openai.example/input/photo.png",
+    );
+    expect(fileCalls[0]?.init?.redirect).toBe("error");
+    expect(calls.some((url) => url.includes("/api/v1/images/compress"))).toBe(
+      true,
+    );
+    expect(calls.some((url) => url.includes("/dl/http-test"))).toBe(false);
+    expect(body.result.structuredContent).toMatchObject({
+      image_base64: null,
+      download_url: "https://api.tinify.dev/dl/http-test",
+      filename: "photo.min.png",
+      mime_type: "image/png",
+    });
+    expect(body.result.content[1]).toMatchObject({
+      type: "resource_link",
+      uri: "https://api.tinify.dev/dl/http-test",
+      name: "photo.min.png",
+    });
+  });
+
+  it("rejects missing or ambiguous hosted image sources before calling upstream", async () => {
+    const { baseUrl, calls } = await startServer();
+    for (const argumentsValue of [
+      {},
+      {
+        image_base64: TINY_PNG_B64,
+        image: {
+          download_url: "https://files.openai.example/input/photo.png",
+          file_id: "file_test_photo",
+        },
+      },
+    ]) {
+      const res = await rpc(baseUrl, {
+        jsonrpc: "2.0",
+        id: 32,
+        method: "tools/call",
+        params: {
+          name: "compress_image",
+          arguments: argumentsValue,
+        },
+      });
+      const body = (await res.json()) as {
+        result: { isError?: boolean; content: Array<{ text?: string }> };
+      };
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0]?.text).toContain(
+        "Provide exactly one image source",
+      );
+    }
+    expect(calls).toEqual([]);
   });
 
   it("get_usage passes through unchanged", async () => {

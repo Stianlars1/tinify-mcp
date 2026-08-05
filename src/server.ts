@@ -7,14 +7,14 @@ import { getUsageTool } from "./tools/usage.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
 
 export const SERVER_NAME = "tinify";
-export const SERVER_VERSION = "0.1.5";
+export const SERVER_VERSION = "0.1.6";
 
 // Human-facing serverInfo (MCP 2025-11-25 Implementation fields). Clients that
 // render connector branding (title/website/icon) read these off the initialize
 // handshake, as do the MCP registry/directories.
 export const SERVER_TITLE = "Tinify image tools";
 export const SERVER_DESCRIPTION =
-  "Compress, resize, crop, and convert images with the Tinify.dev API. Honest results: never returns a larger file.";
+  "Compress, resize, crop, and convert images with the Tinify.dev API. Returns exact sizes and reports when a result is larger.";
 export const SERVER_WEBSITE_URL = "https://tinify.dev/mcp";
 export const SERVER_ICON_URL = "https://tinify.dev/tinify-icon.png";
 
@@ -38,8 +38,8 @@ export const allTools = [
 
 /**
  * Builds an McpServer wired to the given client. Defaults to the stdio
- * (local-filesystem) toolset; the remote HTTP entry passes the base64
- * toolset and its own instructions instead.
+ * (local-filesystem) toolset; the remote HTTP entry passes its attachment /
+ * base64 toolset and its own instructions instead.
  */
 export function createServer(
   client: TinifyLikeClient,

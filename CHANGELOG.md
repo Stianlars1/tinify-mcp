@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-05
+
+### Added
+
+- ChatGPT attachment inputs on every hosted image tool using the documented
+  `openai/fileParams` file object contract.
+- Temporary MCP `resource_link` results so ChatGPT can present the processed
+  image without moving megabytes of base64 through the model context.
+- Bounded attachment downloads: HTTPS only, public DNS only, no redirects,
+  30-second timeout, MIME checks, and the upstream 40 MB size limit.
+- Per-tool OAuth metadata and the `tinify:use` scope for the hosted server.
+- An environment-backed `/.well-known/openai-apps-challenge` endpoint for
+  OpenAI domain verification without checking a portal token into source.
+
+### Changed
+
+- The hosted tools now accept exactly one of `image` (ChatGPT attachment) or
+  `image_base64` (portable fallback). Existing base64 callers still receive
+  `structuredContent.image_base64`.
+- OAuth authorization codes, access tokens, and refresh tokens are bound to
+  the advertised MCP resource and cannot be exchanged for another resource.
+- Hosted tool descriptions now state their private Tinify operation and
+  temporary result-link behavior for OpenAI review.
+
 ## [0.1.5] - 2026-07-26
 
 ### Changed

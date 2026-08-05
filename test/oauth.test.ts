@@ -150,6 +150,8 @@ async function fullDance(
     code_challenge: challenge,
     code_challenge_method: "S256",
     state: "xyz-state",
+    scope: "tinify:use",
+    resource: `${baseUrl}/mcp`,
     api_key: VALID_KEY,
   });
   expect(authRes.status).toBe(302);
@@ -161,6 +163,8 @@ async function fullDance(
     code_verifier: overrides.verifierForToken ?? verifier,
     redirect_uri: REDIRECT_URI,
     client_id: clientId,
+    scope: "tinify:use",
+    resource: `${baseUrl}/mcp`,
   });
   return { clientId, verifier, code, tokenRes };
 }
@@ -176,10 +180,12 @@ describe("OAuth metadata", () => {
       resource: string;
       authorization_servers: string[];
       bearer_methods_supported: string[];
+      scopes_supported: string[];
     };
     expect(body.resource).toBe(`${baseUrl}/mcp`);
     expect(body.authorization_servers).toEqual([baseUrl]);
     expect(body.bearer_methods_supported).toEqual(["header"]);
+    expect(body.scopes_supported).toEqual(["tinify:use"]);
   });
 
   it("serves authorization-server metadata", async () => {
@@ -198,6 +204,7 @@ describe("OAuth metadata", () => {
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
+      scopes_supported: ["tinify:use"],
     });
   });
 
@@ -261,6 +268,8 @@ describe("authorize page", () => {
     url.searchParams.set("code_challenge", challenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("state", "abc");
+    url.searchParams.set("scope", "tinify:use");
+    url.searchParams.set("resource", `${baseUrl}/mcp`);
     const res = await fetch(url);
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("text/html");
@@ -268,6 +277,7 @@ describe("authorize page", () => {
     expect(html).toContain("Connect Tinify");
     expect(html).toContain('name="api_key"');
     expect(html).toContain(challenge); // PKCE round-trips through the form
+    expect(html).toContain(`${baseUrl}/mcp`); // resource round-trips too
   });
 
   it("GET /authorize with an unknown client_id + valid redirect_uri lazily registers and shows the form", async () => {
@@ -371,10 +381,12 @@ describe("full PKCE authorization-code flow", () => {
       token_type: string;
       expires_in: number;
       refresh_token: string;
+      scope: string;
     };
     expect(token.token_type).toBe("Bearer");
     expect(token.expires_in).toBeGreaterThan(0);
     expect(typeof token.refresh_token).toBe("string");
+    expect(token.scope).toBe("tinify:use");
 
     // The access token is opaque: it is not the tnf_ key.
     expect(token.access_token).not.toBe(VALID_KEY);
@@ -416,6 +428,38 @@ describe("full PKCE authorization-code flow", () => {
     expect(tokenRes.status).toBe(400);
     const body = (await tokenRes.json()) as { error: string };
     expect(body.error).toBe("invalid_grant");
+  });
+
+  it("binds access tokens to the MCP resource and rejects resource substitution", async () => {
+    const { baseUrl } = await startServer();
+    const clientId = await register(baseUrl);
+    const { verifier, challenge } = pkce();
+    const authRes = await postForm(baseUrl, "/authorize", {
+      response_type: "code",
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      scope: "tinify:use",
+      resource: `${baseUrl}/mcp`,
+      api_key: VALID_KEY,
+    });
+    const code =
+      new URL(authRes.headers.get("location") ?? "").searchParams.get("code") ??
+      "";
+    const tokenRes = await postForm(baseUrl, "/token", {
+      grant_type: "authorization_code",
+      code,
+      code_verifier: verifier,
+      redirect_uri: REDIRECT_URI,
+      client_id: clientId,
+      scope: "tinify:use",
+      resource: "https://other.example/mcp",
+    });
+    expect(tokenRes.status).toBe(400);
+    expect(((await tokenRes.json()) as { error: string }).error).toBe(
+      "invalid_target",
+    );
   });
 
   it("makes authorization codes single-use", async () => {

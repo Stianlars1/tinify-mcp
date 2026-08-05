@@ -7,6 +7,14 @@
 /** tnf_live_* or tnf_test_* followed by at least one key character. */
 export const API_KEY_PATTERN = /^tnf_(?:live|test)_[A-Za-z0-9._-]+$/;
 
+/**
+ * One OAuth scope covers the hosted MCP server. The underlying Tinify API key
+ * grants both image processing and usage reads, so advertising narrower scopes
+ * would imply isolation that the upstream credential cannot enforce.
+ */
+export const TINIFY_OAUTH_SCOPE = "tinify:use";
+export const TINIFY_OAUTH_SCOPES = [TINIFY_OAUTH_SCOPE] as const;
+
 /** Extracts the raw token from an `Authorization: Bearer <token>` header. */
 export function extractBearerToken(
   authorization: string | undefined,

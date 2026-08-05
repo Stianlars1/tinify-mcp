@@ -1,6 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { API_KEY_PATTERN } from "./auth-shared.js";
+import {
+  API_KEY_PATTERN,
+  TINIFY_OAUTH_SCOPE,
+  TINIFY_OAUTH_SCOPES,
+} from "./auth-shared.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
 
 /**
@@ -55,18 +59,24 @@ interface AuthCode {
   redirectUri: string;
   codeChallenge: string;
   apiKey: string;
+  resource: string;
+  scope: string;
   expiresAt: number;
 }
 
 interface AccessToken {
   apiKey: string;
   clientId: string;
+  resource: string;
+  scope: string;
   expiresAt: number;
 }
 
 interface RefreshToken {
   apiKey: string;
   clientId: string;
+  resource: string;
+  scope: string;
   expiresAt: number;
 }
 
@@ -155,7 +165,7 @@ export interface OAuthProvider {
   /** Handles an OAuth request. Assumes CORS headers were already applied. */
   handle(ctx: OAuthRequestContext): Promise<void>;
   /** Resolves an opaque access token to its stored tnf_ key, or null. */
-  resolveAccessToken(token: string): string | null;
+  resolveAccessToken(token: string, resource: string): string | null;
   /** WWW-Authenticate value pointing clients at the resource metadata. */
   wwwAuthenticate(baseUrl: string): string;
 }
@@ -232,7 +242,9 @@ export function createOAuthProvider(
     return {
       resource: `${baseUrl}/mcp`,
       authorization_servers: [baseUrl],
+      scopes_supported: [...TINIFY_OAUTH_SCOPES],
       bearer_methods_supported: ["header"],
+      resource_documentation: "https://tinify.dev/mcp",
     };
   }
 
@@ -246,7 +258,26 @@ export function createOAuthProvider(
       grant_types_supported: ["authorization_code", "refresh_token"],
       code_challenge_methods_supported: ["S256"],
       token_endpoint_auth_methods_supported: ["none"],
+      scopes_supported: [...TINIFY_OAUTH_SCOPES],
     };
+  }
+
+  function normalizeScope(rawScope: string): string | null {
+    const scopes =
+      rawScope.trim() === ""
+        ? [TINIFY_OAUTH_SCOPE]
+        : [...new Set(rawScope.trim().split(/\s+/))];
+    if (
+      scopes.length !== 1 ||
+      scopes[0] !== TINIFY_OAUTH_SCOPE
+    ) {
+      return null;
+    }
+    return TINIFY_OAUTH_SCOPE;
+  }
+
+  function expectedResource(baseUrl: string): string {
+    return `${baseUrl}/mcp`;
   }
 
   async function readBody(req: IncomingMessage): Promise<string> {
@@ -354,6 +385,7 @@ export function createOAuthProvider(
     codeChallengeMethod: string;
     state: string;
     scope: string;
+    resource: string;
   }
 
   /**
@@ -425,8 +457,25 @@ export function createOAuthProvider(
     title: string,
     message: string,
   ): void {
-    res.writeHead(status, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(renderPage({ title, error: message }));
+    sendHtml(res, status, renderPage({ title, error: message }));
+  }
+
+  function sendHtml(
+    res: ServerResponse,
+    status: number,
+    html: string,
+  ): void {
+    res.writeHead(status, {
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Security-Policy":
+        "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Cache-Control": "no-store",
+      Pragma: "no-cache",
+    });
+    res.end(html);
   }
 
   /** GET /authorize - render the "Connect Tinify" key-entry page. */
@@ -456,9 +505,37 @@ export function createOAuthProvider(
       );
       return;
     }
+    const resource = p.resource || expectedResource(ctx.baseUrl);
+    if (resource !== expectedResource(ctx.baseUrl)) {
+      redirectError(
+        res,
+        p.redirectUri,
+        "invalid_target",
+        p.state,
+        "The resource parameter must identify this Tinify MCP endpoint.",
+      );
+      return;
+    }
+    const scope = normalizeScope(p.scope);
+    if (scope === null) {
+      redirectError(
+        res,
+        p.redirectUri,
+        "invalid_scope",
+        p.state,
+        `Supported scope: ${TINIFY_OAUTH_SCOPE}.`,
+      );
+      return;
+    }
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(renderPage({ title: "Connect Tinify", form: p }));
+    sendHtml(
+      res,
+      200,
+      renderPage({
+        title: "Connect Tinify",
+        form: { ...p, resource, scope },
+      }),
+    );
   }
 
   function readAuthorizeQuery(url: URL): AuthorizeParams {
@@ -471,6 +548,7 @@ export function createOAuthProvider(
       codeChallengeMethod: q.get("code_challenge_method") ?? "",
       state: q.get("state") ?? "",
       scope: q.get("scope") ?? "",
+      resource: q.get("resource") ?? "",
     };
   }
 
@@ -486,6 +564,7 @@ export function createOAuthProvider(
       codeChallengeMethod: params.get("code_challenge_method") ?? "",
       state: params.get("state") ?? "",
       scope: params.get("scope") ?? "",
+      resource: params.get("resource") ?? "",
     };
 
     const client = verifyClientRedirect(res, p.clientId, p.redirectUri);
@@ -500,15 +579,38 @@ export function createOAuthProvider(
       );
       return;
     }
+    const resource = p.resource || expectedResource(ctx.baseUrl);
+    if (resource !== expectedResource(ctx.baseUrl)) {
+      redirectError(
+        res,
+        p.redirectUri,
+        "invalid_target",
+        p.state,
+        "The resource parameter must identify this Tinify MCP endpoint.",
+      );
+      return;
+    }
+    const scope = normalizeScope(p.scope);
+    if (scope === null) {
+      redirectError(
+        res,
+        p.redirectUri,
+        "invalid_scope",
+        p.state,
+        `Supported scope: ${TINIFY_OAUTH_SCOPE}.`,
+      );
+      return;
+    }
 
     const apiKey = (params.get("api_key") ?? "").trim();
     if (!API_KEY_PATTERN.test(apiKey)) {
       // Never echo the entered value back into the page.
-      res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
+      sendHtml(
+        res,
+        400,
         renderPage({
           title: "Connect Tinify",
-          form: p,
+          form: { ...p, resource, scope },
           error:
             "That does not look like a Tinify API key. It should start with tnf_live_ or tnf_test_.",
         }),
@@ -524,11 +626,12 @@ export function createOAuthProvider(
       keyValid = false;
     }
     if (!keyValid) {
-      res.writeHead(401, { "Content-Type": "text/html; charset=utf-8" });
-      res.end(
+      sendHtml(
+        res,
+        401,
         renderPage({
           title: "Connect Tinify",
-          form: p,
+          form: { ...p, resource, scope },
           error:
             "We could not verify that key against the Tinify API. Check it and try again.",
         }),
@@ -543,6 +646,8 @@ export function createOAuthProvider(
       redirectUri: p.redirectUri,
       codeChallenge: p.codeChallenge,
       apiKey,
+      resource,
+      scope,
       expiresAt: Date.now() + AUTH_CODE_TTL_MS,
     });
 
@@ -587,6 +692,7 @@ export function createOAuthProvider(
     const codeVerifier = params.get("code_verifier") ?? "";
     const redirectUri = params.get("redirect_uri") ?? "";
     const clientId = params.get("client_id") ?? "";
+    const resource = params.get("resource") ?? "";
 
     // Single-use: consume the code the moment it is presented, so a replay
     // (or a leaked code used twice) always fails.
@@ -613,8 +719,26 @@ export function createOAuthProvider(
       sendOAuthError(res, 400, "invalid_grant", "client_id mismatch.");
       return;
     }
+    if (resource !== "" && resource !== entry.resource) {
+      sendOAuthError(res, 400, "invalid_target", "resource mismatch.");
+      return;
+    }
+    const requestedScope = params.get("scope") ?? "";
+    if (
+      requestedScope !== "" &&
+      normalizeScope(requestedScope) !== entry.scope
+    ) {
+      sendOAuthError(res, 400, "invalid_scope", "scope escalation is not allowed.");
+      return;
+    }
 
-    issueTokens(res, entry.apiKey, entry.clientId, params.get("scope"));
+    issueTokens(
+      res,
+      entry.apiKey,
+      entry.clientId,
+      entry.resource,
+      entry.scope,
+    );
   }
 
   function handleRefreshTokenGrant(
@@ -623,6 +747,7 @@ export function createOAuthProvider(
   ): void {
     const refreshToken = params.get("refresh_token") ?? "";
     const clientId = params.get("client_id") ?? "";
+    const resource = params.get("resource") ?? "";
 
     const entry = refreshTokens.get(refreshToken);
     if (entry === undefined || entry.expiresAt <= Date.now()) {
@@ -634,16 +759,35 @@ export function createOAuthProvider(
       sendOAuthError(res, 400, "invalid_grant", "client_id mismatch.");
       return;
     }
+    if (resource !== "" && resource !== entry.resource) {
+      sendOAuthError(res, 400, "invalid_target", "resource mismatch.");
+      return;
+    }
+    const requestedScope = params.get("scope") ?? "";
+    if (
+      requestedScope !== "" &&
+      normalizeScope(requestedScope) !== entry.scope
+    ) {
+      sendOAuthError(res, 400, "invalid_scope", "scope escalation is not allowed.");
+      return;
+    }
     // Rotate the refresh token on every use.
     refreshTokens.delete(refreshToken);
-    issueTokens(res, entry.apiKey, entry.clientId, params.get("scope"));
+    issueTokens(
+      res,
+      entry.apiKey,
+      entry.clientId,
+      entry.resource,
+      entry.scope,
+    );
   }
 
   function issueTokens(
     res: ServerResponse,
     apiKey: string,
     clientId: string,
-    scope: string | null | undefined,
+    resource: string,
+    scope: string,
   ): void {
     if (accessTokens.size >= MAX_STORED_ENTRIES) sweepExpired();
     const now = Date.now();
@@ -652,11 +796,15 @@ export function createOAuthProvider(
     accessTokens.set(accessToken, {
       apiKey,
       clientId,
+      resource,
+      scope,
       expiresAt: now + ACCESS_TOKEN_TTL_MS,
     });
     refreshTokens.set(refreshToken, {
       apiKey,
       clientId,
+      resource,
+      scope,
       expiresAt: now + REFRESH_TOKEN_TTL_MS,
     });
     sendJson(
@@ -667,9 +815,7 @@ export function createOAuthProvider(
         token_type: "Bearer",
         expires_in: Math.floor(ACCESS_TOKEN_TTL_MS / 1000),
         refresh_token: refreshToken,
-        ...(scope !== null && scope !== undefined && scope !== ""
-          ? { scope }
-          : {}),
+        scope,
       },
       { "Cache-Control": "no-store", Pragma: "no-cache" },
     );
@@ -729,11 +875,14 @@ export function createOAuthProvider(
       sendOAuthError(res, 404, "invalid_request", "Not found.");
     },
 
-    resolveAccessToken(token: string): string | null {
+    resolveAccessToken(token: string, resource: string): string | null {
       const entry = accessTokens.get(token);
       if (entry === undefined) return null;
       if (entry.expiresAt <= Date.now()) {
         accessTokens.delete(token);
+        return null;
+      }
+      if (entry.resource !== resource || entry.scope !== TINIFY_OAUTH_SCOPE) {
         return null;
       }
       return entry.apiKey;
@@ -741,7 +890,7 @@ export function createOAuthProvider(
 
     wwwAuthenticate(baseUrl: string): string {
       const metadataUrl = `${baseUrl}/.well-known/oauth-protected-resource`;
-      return `Bearer error="invalid_token", resource_metadata="${metadataUrl}"`;
+      return `Bearer error="invalid_token", error_description="Connect Tinify to continue", scope="${TINIFY_OAUTH_SCOPE}", resource_metadata="${metadataUrl}"`;
     },
   };
 }
@@ -756,6 +905,7 @@ interface RenderPageOptions {
     codeChallengeMethod: string;
     state: string;
     scope: string;
+    resource: string;
   };
   error?: string;
 }
@@ -783,6 +933,7 @@ function renderPage(options: RenderPageOptions): string {
       <input type="hidden" name="code_challenge_method" value="${escapeHtml(form.codeChallengeMethod)}">
       <input type="hidden" name="state" value="${escapeHtml(form.state)}">
       <input type="hidden" name="scope" value="${escapeHtml(form.scope)}">
+      <input type="hidden" name="resource" value="${escapeHtml(form.resource)}">
       <label for="api_key">Tinify API key</label>
       <input id="api_key" name="api_key" type="password" inputmode="text"
              autocomplete="off" autocapitalize="off" autocorrect="off"

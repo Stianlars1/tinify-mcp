@@ -1,6 +1,7 @@
 import { stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import {
   MAX_FILE_BYTES,
   TinifyApiError,
@@ -50,7 +51,10 @@ export const DOWNLOAD_TIMEOUT_MS = 45_000;
 
 export interface TextResult {
   [key: string]: unknown;
-  content: Array<{ type: "text"; text: string }>;
+  content: [
+    { type: "text"; text: string },
+    ...CallToolResult["content"],
+  ];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }

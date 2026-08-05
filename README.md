@@ -1,6 +1,6 @@
 # @tinify-dev/mcp
 
-MCP (Model Context Protocol) server for the [Tinify.dev](https://tinify.dev/developers) image API. Lets Claude, Cursor, and any other MCP client compress, resize, crop, and convert local images — with honest results.
+MCP (Model Context Protocol) server for the [Tinify.dev](https://tinify.dev/developers) image API. Lets ChatGPT, Claude, Cursor, and other MCP clients compress, resize, crop, and convert images — with honest results.
 
 ```text
 You: compress the screenshots in ~/Desktop/launch/
@@ -75,7 +75,24 @@ Two ways to authenticate:
 - **OAuth (for connectors)** - ChatGPT connectors and the claude.ai directory only speak "OAuth" or "no auth". Add the server by its URL (`https://api.tinify.dev/mcp`) and pick **OAuth**; the client discovers the authorization and token endpoints automatically from the server's `.well-known` metadata, registers itself, and opens a **Connect Tinify** page where you paste your Tinify API key. Your key stays the credential - the client only ever holds an opaque token that maps back to it server-side.
 - **Direct bearer (for scripts/CLIs)** - send `Authorization: Bearer tnf_live_...` (or `tnf_test_...`) and skip OAuth entirely. Unchanged.
 
-Because the hosted server has no access to your filesystem, the image tools take base64 instead of paths: send `image_base64` (optionally with `filename`), and the result comes back as base64 in `structuredContent.image_base64` plus a text summary with byte counts. Inputs are capped at ~28 MB decoded (the 40 MB API limit minus base64 overhead); URLs are not accepted - the server never fetches remote content. `get_usage` is identical to the local version. Nothing is written to disk on either side.
+### ChatGPT developer-mode connection
+
+1. In ChatGPT, open **Settings → Security and login** and enable **Developer mode**.
+2. Open [ChatGPT Plugins](https://chatgpt.com/plugins), select the plus button, and add `https://api.tinify.dev/mcp`.
+3. Complete **Connect Tinify** with a Tinify API key.
+4. Add the connection from the conversation's tools menu, attach a PNG/JPEG/WebP/AVIF, and ask:
+
+   ```text
+   Use Tinify to compress this image for the web. Show the original size,
+   result size, and percentage saved.
+   ```
+
+The hosted server cannot access local paths, so each image tool accepts exactly one of:
+
+- `image` — the ChatGPT attachment object. ChatGPT fills this automatically because the descriptor advertises `openai/fileParams`.
+- `image_base64` — a portable fallback for other MCP clients, capped at ~28 MB decoded.
+
+ChatGPT attachment downloads are HTTPS-only, reject private/reserved network targets and redirects, time out after 30 seconds, and are capped at the Tinify API's 40 MB limit. Successful operations return exact byte metrics and a temporary MCP result link. Existing base64 callers also receive `structuredContent.image_base64` for backwards compatibility. `get_usage` is identical to the local version. Nothing is written to the user's filesystem.
 
 Try it with curl:
 
@@ -88,6 +105,22 @@ curl -s https://api.tinify.dev/mcp \
 ```
 
 For local files, prefer the stdio server above - it reads and writes them directly with no base64 round-trip and no 28 MB cap.
+
+### One server, two transport adapters
+
+This repository intentionally supports both OpenAI and Claude:
+
+- The shared tool names, Tinify client, result metrics, errors, and annotations are platform-neutral.
+- The stdio adapter uses absolute local paths and writes files for desktop/CLI clients such as Claude, Cursor, and Codex.
+- The hosted adapter uses ChatGPT file attachments or base64 and returns temporary result links because hosted servers cannot read a user's filesystem.
+
+An OpenAI-only repository would duplicate the Tinify logic and make behavior drift more likely. OpenAI-specific descriptor metadata stays as a small additive layer in the hosted adapter; a separate repository is not needed.
+
+For public OpenAI submission, set the portal-provided domain token as
+`OPENAI_APPS_CHALLENGE_TOKEN` in `/etc/tinify/mcp-http.env` and deploy the
+matching nginx location from `deploy/nginx-location.conf`. The endpoint returns
+only that token at `/.well-known/openai-apps-challenge`; do not commit the real
+portal token.
 
 ## Tools
 

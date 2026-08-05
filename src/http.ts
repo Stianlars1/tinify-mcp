@@ -10,7 +10,8 @@ import { TinifyClient } from "@tinify-dev/client";
 import { API_KEY_PATTERN, extractBearerToken } from "./auth-shared.js";
 import { createOAuthProvider, type OAuthProvider } from "./oauth.js";
 import { createServer } from "./server.js";
-import { REMOTE_INSTRUCTIONS, remoteTools } from "./tools/remote.js";
+import { createRemoteTools, REMOTE_INSTRUCTIONS } from "./tools/remote.js";
+import type { RemoteFileOptions } from "./tools/remote-input.js";
 import type { TinifyLikeClient } from "./tools/shared.js";
 
 /**
@@ -24,6 +25,7 @@ import type { TinifyLikeClient } from "./tools/shared.js";
  */
 
 export const DEFAULT_PORT = 3102;
+const OPENAI_CHALLENGE_PATH = "/.well-known/openai-apps-challenge";
 
 /**
  * Hard cap on the request body. Generous headroom above the 28 MB decoded
@@ -48,6 +50,11 @@ export interface HttpServerOptions {
    * TINIFY_BASE_URL for staging).
    */
   clientFactory?: (apiKey: string) => TinifyLikeClient;
+  /**
+   * Overrides the ChatGPT attachment downloader in tests. Production uses
+   * platform fetch plus public-DNS validation, no redirects, and a size cap.
+   */
+  remoteFiles?: RemoteFileOptions;
 }
 
 function defaultClientFactory(apiKey: string): TinifyLikeClient {
@@ -140,12 +147,13 @@ export function extractApiKey(
 function resolveApiKey(
   authorization: string | undefined,
   oauth: OAuthProvider,
+  resource: string,
 ): string | null {
   const direct = extractApiKey(authorization);
   if (direct !== null) return direct;
   const token = extractBearerToken(authorization);
   if (token === null) return null;
-  return oauth.resolveAccessToken(token);
+  return oauth.resolveAccessToken(token, resource);
 }
 
 class BodyTooLargeError extends Error {}
@@ -173,10 +181,15 @@ async function handleMcpPost(
   req: IncomingMessage,
   res: ServerResponse,
   clientFactory: (apiKey: string) => TinifyLikeClient,
+  remoteTools: ReturnType<typeof createRemoteTools>,
   oauth: OAuthProvider,
   baseUrl: string,
 ): Promise<void> {
-  const apiKey = resolveApiKey(req.headers.authorization, oauth);
+  const apiKey = resolveApiKey(
+    req.headers.authorization,
+    oauth,
+    `${baseUrl}/mcp`,
+  );
   if (apiKey === null) {
     sendUnauthorized(res, oauth.wwwAuthenticate(baseUrl));
     return;
@@ -230,6 +243,7 @@ async function handleMcpPost(
  */
 export function createHttpServer(options: HttpServerOptions = {}): Server {
   const clientFactory = options.clientFactory ?? defaultClientFactory;
+  const remoteTools = createRemoteTools(options.remoteFiles);
   const oauth = createOAuthProvider({ clientFactory });
   return createNodeHttpServer((req, res) => {
     const method = req.method ?? "GET";
@@ -238,6 +252,30 @@ export function createHttpServer(options: HttpServerOptions = {}): Server {
 
     if (pathname === "/healthz" && (method === "GET" || method === "HEAD")) {
       sendJson(res, 200, { ok: true });
+      return;
+    }
+
+    if (
+      pathname === OPENAI_CHALLENGE_PATH &&
+      (method === "GET" || method === "HEAD")
+    ) {
+      const token = process.env["OPENAI_APPS_CHALLENGE_TOKEN"];
+      if (token === undefined || token.trim() === "") {
+        sendJson(
+          res,
+          404,
+          jsonRpcError(
+            -32601,
+            "OpenAI domain verification is not configured.",
+          ),
+        );
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+      });
+      res.end(method === "HEAD" ? undefined : token.trim());
       return;
     }
 
@@ -287,7 +325,7 @@ export function createHttpServer(options: HttpServerOptions = {}): Server {
     }
 
     const baseUrl = getBaseUrl(req);
-    handleMcpPost(req, res, clientFactory, oauth, baseUrl).catch(
+    handleMcpPost(req, res, clientFactory, remoteTools, oauth, baseUrl).catch(
       (error: unknown) => {
         console.error(
           "tinify-mcp-http: request failed:",
