@@ -24,9 +24,11 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run smoke
+      # Trusted publishing (OIDC): the npm package's Trusted Publisher is set
+      # to this repo + workflow, so no NPM_TOKEN secret exists or is needed.
+      # The runner's bundled npm predates OIDC support (needs >= 11.5.1).
+      - run: npm install -g npm@latest
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   mcpb:
     # Packs the Claude Desktop bundle and attaches it to a GitHub release,
